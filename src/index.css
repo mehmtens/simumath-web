@@ -1,0 +1,54 @@
+:root {
+  --bg: #0b1220;
+  --bg-grid: rgba(255, 255, 255, 0.035);
+  --panel: #121b2e;
+  --panel-raised: #17233a;
+  --panel-border: #263758;
+  --text: #e8ecf3;
+  --text-muted: #7c8bab;
+  --accent-amber: #f2a93b;
+  --accent-amber-dim: #8a6626;
+  --accent-teal: #3ecf8e;
+  --accent-red: #e65b5b;
+  --font-display: 'JetBrains Mono', monospace;
+  --font-body: 'Inter', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--bg-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+input, select {
+  font-family: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--accent-amber);
+  color: #14100a;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-teal);
+  outline-offset: 2px;
+}
