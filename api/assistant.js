@@ -54,17 +54,17 @@ function parseParams(raw) {
 }
 
 async function createResponse(body) {
-  const response = await fetch('https://api.openai.com/v1/responses', {
+  const response = await fetch('https://api.groq.com/openai/v1/responses', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+      authorization: `Bearer ${process.env.GROQ_API_KEY}`
     },
     body: JSON.stringify(body)
   });
   const data = await response.json();
   if (!response.ok) {
-    const message = data?.error?.message || `OpenAI API ${response.status}`;
+    const message = data?.error?.message || `Groq API ${response.status}`;
     throw new Error(message);
   }
   return data;
@@ -77,8 +77,8 @@ function outputText(response) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'OPENAI_API_KEY yapılandırılmamış.' });
-  const model = process.env.OPENAI_MODEL || 'gpt-5.6-luna';
+  if (!process.env.GROQ_API_KEY) return res.status(503).json({ error: 'GROQ_API_KEY yapılandırılmamış.' });
+  const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
   try {
     const { message, history = [], currentState = '' } = req.body || {};
     if (!message || typeof message !== 'string') return res.status(400).json({ error: 'message gerekli.' });
@@ -105,9 +105,9 @@ export default async function handler(req, res) {
     if (outputs.length) {
       response = await createResponse({ model, instructions, previous_response_id: response.id, input: outputs, tools, reasoning: { effort: 'low' } });
     }
-    return res.status(200).json({ text: outputText(response) || issue?.explanation || 'Hazır.', action: action ? { ...action, hash: hashForAction(action) } : null, issue, responseId: response.id, model });
+    return res.status(200).json({ text: outputText(response) || issue?.explanation || 'Hazır.', action: action ? { ...action, hash: hashForAction(action) } : null, issue, responseId: response.id, model, provider: 'groq' });
   } catch (error) {
-    console.error('SimuMath Copilot:', error?.message || error);
+    console.error('SimuMath Copilot (Groq):', error?.message || error);
     return res.status(500).json({ error: 'Copilot isteği işlenemedi.', detail: process.env.NODE_ENV === 'development' ? String(error?.message || error) : undefined });
   }
 }
