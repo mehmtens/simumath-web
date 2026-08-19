@@ -76,17 +76,9 @@ function outputText(response) {
 }
 
 export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'OPENAI_API_KEY yapılandırılmamış.' });
   const model = process.env.OPENAI_MODEL || 'gpt-5.6-luna';
-  if (req.method === 'GET' && req.query?.smoke === '1') {
-    try {
-      const response = await createResponse({ model, input: 'Reply with exactly: SIMUMATH_OK', reasoning: { effort: 'none' }, max_output_tokens: 16 });
-      return res.status(200).json({ ok: outputText(response).includes('SIMUMATH_OK'), model, text: outputText(response) });
-    } catch (error) {
-      return res.status(500).json({ ok: false, model, error: String(error?.message || error) });
-    }
-  }
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
     const { message, history = [], currentState = '' } = req.body || {};
     if (!message || typeof message !== 'string') return res.status(400).json({ error: 'message gerekli.' });
