@@ -1,9 +1,14 @@
+const SIMUMATH_SCRIPT_ORIGIN = (() => {
+  try { return new URL(document.currentScript?.src || window.location.href).origin; }
+  catch { return window.location.origin; }
+})();
+
 class SimuMathEmbed extends HTMLElement {
   connectedCallback() {
     const moduleName = this.getAttribute('module') || 'ode';
     const state = this.getAttribute('state') || '';
     const height = this.getAttribute('height') || '620';
-    const base = this.getAttribute('base') || window.location.origin;
+    const base = this.getAttribute('base') || SIMUMATH_SCRIPT_ORIGIN;
     const params = new URLSearchParams(state);
     params.set('embed', '1');
     const frame = document.createElement('iframe');
