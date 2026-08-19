@@ -2,24 +2,20 @@ let wasmModulePromise;
 
 async function loadWasmModule() {
   if (!wasmModulePromise) {
-    wasmModulePromise = import('../../public/wasm/simumath_wasm.js')
-      .then(async (mod) => { if (typeof mod.default === 'function') await mod.default(); return mod; })
+    wasmModulePromise = import(/* @vite-ignore */ '/wasm/simumath_wasm.js')
+      .then(async (mod) => { if (typeof mod.default === 'function') await mod.default('/wasm/simumath_wasm_bg.wasm'); return mod; })
       .catch(() => null);
   }
   return wasmModulePromise;
 }
 
-export async function wasmStatus() {
-  return (await loadWasmModule()) ? 'wasm' : 'fallback';
-}
+export async function wasmStatus() { return (await loadWasmModule()) ? 'wasm' : 'fallback'; }
 
 export async function fastMatrixMultiply(a, b, fallback) {
   const wasm = await loadWasmModule();
   if (!wasm?.matmul) return fallback(a, b);
   const rows = a.length, inner = a[0]?.length || 0, cols = b[0]?.length || 0;
-  const flatA = Float64Array.from(a.flat());
-  const flatB = Float64Array.from(b.flat());
-  const flat = wasm.matmul(flatA, rows, inner, flatB, cols);
+  const flat = wasm.matmul(Float64Array.from(a.flat()), rows, inner, Float64Array.from(b.flat()), cols);
   return Array.from({ length: rows }, (_, i) => Array.from(flat.slice(i * cols, (i + 1) * cols)));
 }
 
