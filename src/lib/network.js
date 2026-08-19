@@ -7,7 +7,6 @@ function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-/** n düğümlü tam bağlı bir graf üretir (yedek/fallback durumu için). */
 function completeGraphEdges(n) {
   const edges = [];
   for (let i = 0; i < n; i++) {
@@ -16,10 +15,6 @@ function completeGraphEdges(n) {
   return edges;
 }
 
-/**
- * Erdos-Renyi tarzı rastgele ağırlıklı graf üretir. Yeterli kenar oluşmazsa
- * tam bağlı bir yedek grafa düşer (Python sürümüyle aynı davranış).
- */
 export function generateWeightedGraph(nNodes, edgeProbability) {
   let edgeList = [];
   for (let i = 0; i < nNodes; i++) {
@@ -35,17 +30,14 @@ export function generateWeightedGraph(nNodes, edgeProbability) {
 
   const edges = edgeList.map(([u, v]) => ({ u, v, weight: randInt(...WEIGHT_RANGE) }));
   const nodes = Array.from({ length: n }, (_, i) => i);
-
   const adjacency = new Map(nodes.map((node) => [node, []]));
   for (const e of edges) {
     adjacency.get(e.u).push({ to: e.v, weight: e.weight });
     adjacency.get(e.v).push({ to: e.u, weight: e.weight });
   }
-
   return { nodes, edges, adjacency };
 }
 
-/** Düğümleri bir çember üzerine yerleştirir (basit, öngörülebilir bir görsel düzen). */
 export function computeCircularLayout(nodes, radius = 4) {
   const positions = {};
   const n = nodes.length;
@@ -56,18 +48,28 @@ export function computeCircularLayout(nodes, radius = 4) {
   return positions;
 }
 
-/**
- * Dijkstra ile iki düğüm arasındaki en kısa yolu bulur. Bağlantısızsa found=false döner.
- */
+function serializeDistances(nodes, dist) {
+  return Object.fromEntries(nodes.map((node) => [node, dist.get(node)]));
+}
+
+/** Dijkstra çalıştırır; final sonucu ve öğretici adım izini birlikte döndürür. */
 export function shortestPath(graph, start, end) {
   if (start === end) {
-    return { found: true, sameNode: true, pathNodes: [start], pathEdges: [] };
+    return {
+      found: true,
+      sameNode: true,
+      distance: 0,
+      pathNodes: [start],
+      pathEdges: [],
+      steps: [{ current: start, visited: [start], distances: { [start]: 0 }, updates: [], note: 'Başlangıç ve hedef aynı.' }],
+    };
   }
 
   const dist = new Map(graph.nodes.map((n) => [n, Infinity]));
   const prev = new Map();
   dist.set(start, 0);
   const visited = new Set();
+  const steps = [];
 
   while (visited.size < graph.nodes.length) {
     let u = null;
@@ -79,20 +81,32 @@ export function shortestPath(graph, start, end) {
       }
     }
     if (u === null) break;
-    visited.add(u);
-    if (u === end) break;
 
+    visited.add(u);
+    const updates = [];
     for (const { to, weight } of graph.adjacency.get(u)) {
-      const alt = dist.get(u) + weight;
-      if (alt < dist.get(to)) {
-        dist.set(to, alt);
+      if (visited.has(to)) continue;
+      const oldDistance = dist.get(to);
+      const candidate = dist.get(u) + weight;
+      if (candidate < oldDistance) {
+        dist.set(to, candidate);
         prev.set(to, u);
+        updates.push({ node: to, from: u, oldDistance, newDistance: candidate, weight });
       }
     }
+
+    steps.push({
+      current: u,
+      visited: [...visited],
+      distances: serializeDistances(graph.nodes, dist),
+      updates,
+      note: u === end ? 'Hedef düğüm kesinleşti.' : `${u} düğümünün komşuları gevşetildi.`,
+    });
+    if (u === end) break;
   }
 
   if (dist.get(end) === Infinity) {
-    return { found: false, sameNode: false, pathNodes: [], pathEdges: [] };
+    return { found: false, sameNode: false, distance: Infinity, pathNodes: [], pathEdges: [], steps };
   }
 
   const pathNodes = [end];
@@ -104,5 +118,5 @@ export function shortestPath(graph, start, end) {
   const pathEdges = [];
   for (let i = 0; i < pathNodes.length - 1; i++) pathEdges.push([pathNodes[i], pathNodes[i + 1]]);
 
-  return { found: true, sameNode: false, pathNodes, pathEdges };
+  return { found: true, sameNode: false, distance: dist.get(end), pathNodes, pathEdges, steps };
 }
