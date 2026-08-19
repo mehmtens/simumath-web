@@ -13,10 +13,10 @@ const tools = [
       additionalProperties: false,
       properties: {
         module: { type: 'string', enum: ['ode', 'matrix', 'fourier', 'network', 'dfa'] },
-        params: { type: 'object', additionalProperties: { type: ['string', 'number', 'boolean'] } },
+        params_json: { type: 'string', description: 'A JSON object string containing only URL-state parameters supported by the chosen SimuMath module.' },
         reason: { type: 'string' }
       },
-      required: ['module', 'params', 'reason']
+      required: ['module', 'params_json', 'reason']
     }
   },
   {
@@ -39,7 +39,7 @@ const tools = [
 
 const instructions = `You are SimuMath Copilot, a concise Turkish-first engineering mathematics tutor embedded inside SimuMath.
 You can reason about ODEs, matrices, Fourier series, Dijkstra graphs, DFA/NFA and numerical methods.
-When the user asks to create or change a simulation, call open_simulation with only parameters supported by the relevant lab URL state.
+When the user asks to create or change a simulation, call open_simulation. Put module parameters in params_json as a valid JSON object string.
 Useful ODE params: type(first|second|custom|rlc|pendulum|heat), expr, m, c, k, y0, v0, t.
 Matrix params: a,b,c,d,vx,vy. Fourier params: wave(square|sawtooth), n.
 If the user asks why something fails or behaves unexpectedly, prefer explain_math_issue and teach the reason.
@@ -49,6 +49,12 @@ function hashForAction(action) {
   const params = new URLSearchParams();
   Object.entries(action.params || {}).forEach(([key, value]) => params.set(key, String(value)));
   return `#${action.module}${params.size ? `?${params}` : ''}`;
+}
+
+function parseParams(raw) {
+  const parsed = JSON.parse(raw || '{}');
+  if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') throw new Error('Invalid params_json');
+  return parsed;
 }
 
 export default async function handler(req, res) {
@@ -69,7 +75,7 @@ export default async function handler(req, res) {
       if (item.type !== 'function_call') continue;
       const args = JSON.parse(item.arguments || '{}');
       if (item.name === 'open_simulation') {
-        action = { module: args.module, params: args.params, reason: args.reason };
+        action = { module: args.module, params: parseParams(args.params_json), reason: args.reason };
         outputs.push({ type: 'function_call_output', call_id: item.call_id, output: JSON.stringify({ ok: true, hash: hashForAction(action), message: 'Simülasyon eylemi hazırlandı.' }) });
       }
       if (item.name === 'explain_math_issue') {
