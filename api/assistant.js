@@ -103,7 +103,10 @@ export default async function handler(req, res) {
       }
     }
     if (outputs.length) {
-      response = await createResponse({ model, instructions, previous_response_id: response.id, input: outputs, tools, reasoning: { effort: 'low' } });
+      // Groq's Responses-compatible endpoint does not support OpenAI's
+      // previous_response_id. Replay the tool-call items with their outputs
+      // so the model can complete the same turn without provider-side state.
+      response = await createResponse({ model, instructions, input: [...(response.output || []), ...outputs], tools, reasoning: { effort: 'low' } });
     }
     return res.status(200).json({ text: outputText(response) || issue?.explanation || 'Hazır.', action: action ? { ...action, hash: hashForAction(action) } : null, issue, responseId: response.id, model, provider: 'groq' });
   } catch (error) {
