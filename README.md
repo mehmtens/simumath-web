@@ -24,6 +24,10 @@ npm run build
 npm run preview   # build'i yerelde test etmek için
 ```
 
+## Online özellikler
+
+Supabase Community/Auth, özel Realtime işbirliği odaları ve LMS/otomatik notlandırma temellerinin kurulum ve güvenlik notları için [`docs/online-platform.md`](docs/online-platform.md) dosyasına bakın.
+
 ## Vercel'e deploy etmek
 
 **Yöntem 1 — GitHub üzerinden (önerilen):**
