@@ -38,3 +38,5 @@ revoke all on function public.touch_simulation_updated_at() from public, anon, a
 
 alter publication supabase_realtime add table public.simulations;
 alter publication supabase_realtime add table public.likes;
+
+create index if not exists likes_user_idx on public.likes (user_id);
