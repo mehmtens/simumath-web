@@ -163,6 +163,7 @@
 }
 .field input,
 .field select,
+.field textarea,
 .assistant-input {
   background: var(--panel-raised);
   border: 1px solid var(--panel-border);
@@ -170,6 +171,10 @@
   padding: 8px 10px;
   color: var(--text);
 }
+.field textarea { resize: vertical; font: 12px/1.5 var(--font-display); }
+.custom-builder { border: 1px solid var(--panel-border); border-radius: 8px; padding: 10px; }
+.custom-builder summary { cursor: pointer; color: var(--accent-teal); font: 700 12px var(--font-display); }
+.custom-builder[open] { display: grid; gap: 12px; }
 .btn {
   font: 700 12px var(--font-display);
   text-transform: uppercase;

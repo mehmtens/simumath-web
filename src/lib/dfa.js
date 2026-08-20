@@ -13,3 +13,30 @@ export const NFA_REGISTRY={
 export function runDfa(definition,inputStr){let state=definition.start;const trace=[[state]];for(const ch of inputStr){if(!definition.alphabet.includes(ch))return{accepted:false,finalStates:[state],invalidChar:ch,trace};state=definition.transitions[`${state},${ch}`];trace.push([state]);}return{accepted:definition.accept.has(state),finalState:state,finalStates:[state],invalidChar:null,isEmptyInput:inputStr==='',trace};}
 export function runNfa(definition,inputStr){let states=new Set([definition.start]);const trace=[[...states]];for(const ch of inputStr){if(!definition.alphabet.includes(ch))return{accepted:false,finalStates:[...states],invalidChar:ch,trace};const next=new Set();for(const s of states)for(const dst of definition.transitions[`${s},${ch}`]??[])next.add(dst);states=next;trace.push([...states]);}return{accepted:[...states].some(s=>definition.accept.has(s)),finalStates:[...states],invalidChar:null,isEmptyInput:inputStr==='',trace};}
 export const runAutomaton=(definition,input)=>definition.kind==='nfa'?runNfa(definition,input):runDfa(definition,input);
+
+export function buildAutomaton({ kind, statesText, alphabetText, start, acceptText, transitionsText }) {
+ const states=[...new Set(statesText.split(/[\s,]+/).filter(Boolean))];
+ const alphabet=[...new Set(alphabetText.split(/[\s,]+/).filter(Boolean))];
+ if(states.length<1)throw new Error('En az bir durum gerekli.');
+ if(alphabet.length<1)throw new Error('En az bir alfabe sembolü gerekli.');
+ if(!states.includes(start))throw new Error('Başlangıç durumu, durumlar listesinde olmalı.');
+ const accept=new Set(acceptText.split(/[\s,]+/).filter(Boolean));
+ for(const state of accept)if(!states.includes(state))throw new Error(`Bilinmeyen kabul durumu: ${state}.`);
+ const transitions={};
+ for(const raw of transitionsText.split(/\r?\n/).map(line=>line.trim()).filter(Boolean)){
+  const match=raw.match(/^([^,\s]+)\s*[,\s]\s*([^\s]+)\s*(?:->|→)\s*(.+)$/);
+  if(!match)throw new Error(`Geçersiz geçiş: ${raw}. Q0,0 -> Q1 biçimini kullan.`);
+  const[,src,symbol,destText]=match;
+  if(!states.includes(src))throw new Error(`Bilinmeyen kaynak durum: ${src}.`);
+  if(!alphabet.includes(symbol))throw new Error(`Alfabede olmayan sembol: ${symbol}.`);
+  const destinations=destText.split(/[|,\s]+/).filter(Boolean);
+  if(!destinations.length||destinations.some(dst=>!states.includes(dst)))throw new Error(`Geçersiz hedef: ${destText}.`);
+  if(kind==='dfa'&&destinations.length!==1)throw new Error('DFA geçişi tek bir hedefe gitmeli.');
+  transitions[`${src},${symbol}`]=kind==='nfa'?destinations:destinations[0];
+ }
+ if(kind==='dfa')for(const state of states)for(const symbol of alphabet)if(!transitions[`${state},${symbol}`])throw new Error(`Eksik DFA geçişi: ${state},${symbol}.`);
+ const positions={};computePositions(states).forEach(([state,pos])=>{positions[state]=pos});
+ return{kind,key:'custom',name:`Özel ${kind.toUpperCase()}`,description:'Kullanıcı tarafından oluşturulan otomata.',alphabet,states,start,accept,transitions,positions};
+}
+
+function computePositions(states){return states.map((state,index)=>{const angle=2*Math.PI*index/states.length-Math.PI/2;return[state,[1.5+1.5*Math.cos(angle),1.5+1.5*Math.sin(angle)]]});}

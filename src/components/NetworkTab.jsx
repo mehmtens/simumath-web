@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import { generateWeightedGraph, computeCircularLayout, shortestPath } from '../lib/network';
+import { buildWeightedGraph, generateWeightedGraph, computeCircularLayout, parseWeightedGraph, shortestPath } from '../lib/network';
 
 const VIEW_SIZE = 380;
 const NODE_R = 20;
@@ -10,7 +10,8 @@ function toScreen(x, y, radius) {
 }
 
 function buildGraphState() {
-  const graph = generateWeightedGraph(7, 0.4);
+  const generated = generateWeightedGraph(7, 0.4);
+  const graph = buildWeightedGraph(generated.nodes.map(String), generated.edges.map((edge) => ({ u: String(edge.u), v: String(edge.v), weight: edge.weight })));
   const positions = computeCircularLayout(graph.nodes);
   return { graph, positions };
 }
@@ -24,6 +25,9 @@ export default function NetworkTab() {
   const [start, setStart] = useState(graph.nodes[0]);
   const [end, setEnd] = useState(graph.nodes[graph.nodes.length - 1]);
   const [stepIndex, setStepIndex] = useState(-1);
+  const [nodesText, setNodesText] = useState('A, B, C, D, E');
+  const [edgesText, setEdgesText] = useState('A B 4\nA C 2\nB C 1\nB D 5\nC D 8\nC E 10\nD E 2');
+  const [editorError, setEditorError] = useState('');
 
   const regenerate = useCallback(() => {
     const next = buildGraphState();
@@ -32,6 +36,19 @@ export default function NetworkTab() {
     setEnd(next.graph.nodes[next.graph.nodes.length - 1]);
     setStepIndex(-1);
   }, []);
+
+  const applyCustomGraph = () => {
+    try {
+      const nextGraph = parseWeightedGraph(nodesText, edgesText);
+      setGraphState({ graph: nextGraph, positions: computeCircularLayout(nextGraph.nodes) });
+      setStart(nextGraph.nodes[0]);
+      setEnd(nextGraph.nodes[nextGraph.nodes.length - 1]);
+      setStepIndex(-1);
+      setEditorError('');
+    } catch (error) {
+      setEditorError(error.message);
+    }
+  };
 
   const result = useMemo(() => shortestPath(graph, start, end), [graph, start, end]);
   useEffect(() => setStepIndex(-1), [start, end]);
@@ -66,15 +83,23 @@ export default function NetworkTab() {
         </p>
         <button className="btn btn-primary" onClick={regenerate}>Yeni Ağ Üret</button>
 
+        <details className="custom-builder">
+          <summary>Kendi ağını oluştur</summary>
+          <div className="field"><label><span>Düğümler</span></label><input value={nodesText} onChange={(e) => setNodesText(e.target.value)} placeholder="A, B, C, D" /></div>
+          <div className="field"><label><span>Kenarlar · her satır: kaynak hedef ağırlık</span></label><textarea rows="7" value={edgesText} onChange={(e) => setEdgesText(e.target.value)} placeholder={'A B 4\nB C 2'} /></div>
+          <button className="btn btn-secondary" onClick={applyCustomGraph}>Ağı Uygula</button>
+          {editorError && <div className="result-banner" style={{ color: 'var(--accent-red)' }}>{editorError}</div>}
+        </details>
+
         <div className="field">
           <label><span>Başlangıç Düğümü</span></label>
-          <select value={start} onChange={(e) => setStart(Number(e.target.value))}>
+          <select value={start} onChange={(e) => setStart(e.target.value)}>
             {graph.nodes.map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
         <div className="field">
           <label><span>Bitiş Düğümü</span></label>
-          <select value={end} onChange={(e) => setEnd(Number(e.target.value))}>
+          <select value={end} onChange={(e) => setEnd(e.target.value)}>
             {graph.nodes.map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>

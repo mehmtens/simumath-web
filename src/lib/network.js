@@ -48,6 +48,42 @@ export function computeCircularLayout(nodes, radius = 4) {
   return positions;
 }
 
+export function buildWeightedGraph(nodeNames, edgeRows) {
+  const nodes = [...new Set(nodeNames.map((node) => String(node).trim()).filter(Boolean))];
+  if (nodes.length < 2) throw new Error('En az iki düğüm gerekli.');
+  const nodeSet = new Set(nodes);
+  const seen = new Set();
+  const edges = edgeRows.map((row) => {
+    const u = String(row.u).trim();
+    const v = String(row.v).trim();
+    const weight = Number(row.weight);
+    if (!nodeSet.has(u) || !nodeSet.has(v)) throw new Error(`Bilinmeyen düğüm: ${u} veya ${v}.`);
+    if (u === v) throw new Error('Bir kenar aynı düğüme bağlanamaz.');
+    if (!Number.isFinite(weight) || weight <= 0) throw new Error('Dijkstra için ağırlıklar pozitif olmalı.');
+    const key = [u, v].sort().join('\0');
+    if (seen.has(key)) throw new Error(`Tekrarlanan kenar: ${u}-${v}.`);
+    seen.add(key);
+    return { u, v, weight };
+  });
+  if (!edges.length) throw new Error('En az bir kenar gerekli.');
+  const adjacency = new Map(nodes.map((node) => [node, []]));
+  for (const edge of edges) {
+    adjacency.get(edge.u).push({ to: edge.v, weight: edge.weight });
+    adjacency.get(edge.v).push({ to: edge.u, weight: edge.weight });
+  }
+  return { nodes, edges, adjacency };
+}
+
+export function parseWeightedGraph(nodesText, edgesText) {
+  const nodes = nodesText.split(/[\s,]+/).filter(Boolean);
+  const rows = edgesText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const parts = line.split(/[\s,;]+/);
+    if (parts.length !== 3) throw new Error(`Geçersiz kenar: ${line}. A B 4 biçimini kullan.`);
+    return { u: parts[0], v: parts[1], weight: parts[2] };
+  });
+  return buildWeightedGraph(nodes, rows);
+}
+
 function serializeDistances(nodes, dist) {
   return Object.fromEntries(nodes.map((node) => [node, dist.get(node)]));
 }
