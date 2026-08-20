@@ -17,6 +17,8 @@ export function updateHashState(route, values = {}) {
 }
 
 export function paramNumber(params, key, fallback) {
-  const value = Number(params.get(key));
+  const raw = params.get(key);
+  if (raw === null || raw.trim() === '') return fallback;
+  const value = Number(raw);
   return Number.isFinite(value) ? value : fallback;
 }

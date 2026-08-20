@@ -1,8 +1,23 @@
 let wasmModulePromise;
+const WASM_ENTRY = '/wasm/simumath_wasm.js';
+
+async function wasmAssetExists() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1500);
+  try {
+    const response = await fetch(WASM_ENTRY, { method: 'HEAD', cache: 'no-store', signal: controller.signal });
+    const type = response.headers.get('content-type') || '';
+    return response.ok && !type.includes('text/html');
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 async function loadWasmModule() {
   if (!wasmModulePromise) {
-    wasmModulePromise = import(/* @vite-ignore */ '/wasm/simumath_wasm.js')
+    wasmModulePromise = wasmAssetExists().then(exists => exists ? import(/* @vite-ignore */ WASM_ENTRY) : null)
       .then(async (mod) => { if (typeof mod.default === 'function') await mod.default('/wasm/simumath_wasm_bg.wasm'); return mod; })
       .catch(() => null);
   }
