@@ -14,7 +14,7 @@ The hardening migration limits user-controlled text/array sizes, tightens owners
 
 The schema separates courses, memberships, assignments, and submissions. Learners cannot insert or update scored rows directly. `submit_assignment` validates course membership and evaluates a versioned grading specification on the database before storing the score.
 
-`GET /api/lti` exposes a platform registration descriptor. Manual course codes, assignments, learner submissions, and database-side scoring are complete. A production LTI launch still requires issuer-specific client IDs, deployment IDs, platform JWKS validation, nonce/state storage, key rotation, and AGS access tokens. Those credentials must remain server-side and can only be finalized after an LMS platform (Canvas, Moodle, Blackboard, etc.) and its registration values are supplied.
+Moodle is the first supported LMS target. `GET /api/lti` exposes its LTI 1.3 registration descriptor. Manual course codes, assignments, learner submissions, and database-side scoring are complete. A production Moodle launch still requires the Moodle site's issuer URL, client ID, deployment ID, platform JWKS URL, nonce/state storage, key rotation, and AGS access tokens. Those credentials must remain server-side and can only be finalized after a Moodle administrator registers SimuMath as an external tool and supplies the generated values.
 
 ## Verification
 
