@@ -2,6 +2,7 @@ create table public.courses (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
   title text not null check (char_length(title) between 1 and 120),
+  join_code text not null default upper(substr(encode(gen_random_bytes(6), 'hex'), 1, 6)) unique check (join_code ~ '^[A-Z0-9]{6}$'),
   lti_issuer text,
   lti_deployment_id text,
   created_at timestamptz not null default now(),
@@ -82,9 +83,13 @@ with check ((select private.can_manage_course(course_id, auth.uid())));
 
 create policy "members read assignments" on public.assignments for select to authenticated
 using ((select private.has_course_role(course_id, auth.uid(), array['instructor','learner'])));
-create policy "instructors manage assignments" on public.assignments for all to authenticated
-using ((select private.has_course_role(course_id, auth.uid(), array['instructor'])))
+create policy "instructors create assignments" on public.assignments for insert to authenticated
 with check (created_by = (select auth.uid()) and (select private.has_course_role(course_id, auth.uid(), array['instructor'])));
+create policy "authors update assignments" on public.assignments for update to authenticated
+using (created_by = (select auth.uid()) and (select private.has_course_role(course_id, auth.uid(), array['instructor'])))
+with check (created_by = (select auth.uid()) and (select private.has_course_role(course_id, auth.uid(), array['instructor'])));
+create policy "authors delete assignments" on public.assignments for delete to authenticated
+using (created_by = (select auth.uid()) and (select private.has_course_role(course_id, auth.uid(), array['instructor'])));
 
 create policy "learners read own submissions" on public.submissions for select to authenticated
 using (learner_id = (select auth.uid()) or exists (
@@ -150,3 +155,23 @@ $$;
 
 revoke all on function public.submit_assignment(uuid, jsonb) from public, anon;
 grant execute on function public.submit_assignment(uuid, jsonb) to authenticated;
+
+create or replace function public.join_course(requested_code text)
+returns public.courses
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  target public.courses;
+begin
+  if (select auth.uid()) is null then raise exception 'authentication required'; end if;
+  select * into target from public.courses where join_code = upper(trim(requested_code));
+  if target.id is null then raise exception 'course not found'; end if;
+  insert into public.course_members (course_id, user_id, role)
+  values (target.id, (select auth.uid()), 'learner') on conflict do nothing;
+  return target;
+end;
+$$;
+revoke all on function public.join_course(text) from public, anon;
+grant execute on function public.join_course(text) to authenticated;

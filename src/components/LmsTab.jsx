@@ -15,6 +15,7 @@ export default function LmsTab() {
     "Canlı laboratuvar ödevi",
   );
   const [selectedCourse, setSelectedCourse] = useState("");
+  const [joinCode, setJoinCode] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
@@ -37,7 +38,14 @@ export default function LmsTab() {
       return setMessage((courseError || assignmentError).message);
     setCourses(courseRows || []);
     setAssignments(assignmentRows || []);
-    setSelectedCourse((current) => current || courseRows?.[0]?.id || "");
+    const firstInstructorCourse = courseRows?.find((course) =>
+      course.course_members?.some((member) => member.role === "instructor"),
+    );
+    setSelectedCourse((current) =>
+      courseRows?.some((course) => course.id === current)
+        ? current
+        : firstInstructorCourse?.id || "",
+    );
   }, [session?.user]);
   useEffect(() => {
     load();
@@ -89,6 +97,22 @@ export default function LmsTab() {
     );
     await load();
   };
+  const joinCourse = async () => {
+    if (joinCode.trim().length !== 6)
+      return setMessage("Ders kodu 6 karakter olmalı.");
+    setBusy(true);
+    const { data, error } = await supabase
+      .rpc("join_course", { requested_code: joinCode.trim().toUpperCase() })
+      .single();
+    setBusy(false);
+    setMessage(error ? error.message : `${data.title} dersine katıldın.`);
+    if (!error) setJoinCode("");
+    await load();
+  };
+  const roleForCourse = (courseId) =>
+    courses
+      .find((course) => course.id === courseId)
+      ?.course_members?.find((member) => member.role)?.role;
   const submit = async (assignment) => {
     const state = captureAssignmentState();
     setBusy(true);
@@ -188,6 +212,19 @@ export default function LmsTab() {
             >
               Son Laboratuvardan Ödev Oluştur
             </button>
+            {selectedCourse && (
+              <div className="result-banner">
+                Öğrenci katılım kodu: <strong>{courses.find((course) => course.id === selectedCourse)?.join_code}</strong>
+              </div>
+            )}
+          </section>
+          <section className="exam-card">
+            <h3>Öğrenci katılımı</h3>
+            <label>
+              6 haneli ders kodu
+              <input value={joinCode} maxLength="6" onChange={(event) => setJoinCode(event.target.value.toUpperCase())} />
+            </label>
+            <button className="btn btn-secondary" disabled={busy} onClick={joinCourse}>Derse Katıl</button>
           </section>
           <section className="community-grid">
             {assignments.map((assignment) => (
@@ -209,13 +246,11 @@ export default function LmsTab() {
                   >
                     Ödevi Aç
                   </button>
-                  <button
-                    className="btn btn-primary"
-                    disabled={busy}
-                    onClick={() => submit(assignment)}
-                  >
-                    Mevcut Durumu Teslim Et
-                  </button>
+                  {roleForCourse(assignment.course_id) === "learner" && (
+                    <button className="btn btn-primary" disabled={busy} onClick={() => submit(assignment)}>
+                      Mevcut Durumu Teslim Et
+                    </button>
+                  )}
                 </div>
               </article>
             ))}

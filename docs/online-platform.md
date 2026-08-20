@@ -14,7 +14,11 @@ The hardening migration limits user-controlled text/array sizes, tightens owners
 
 The schema separates courses, memberships, assignments, and submissions. Learners cannot insert or update scored rows directly. `submit_assignment` validates course membership and evaluates a versioned grading specification on the database before storing the score.
 
-`GET /api/lti` exposes a platform registration descriptor. The login, launch, JWKS, and Assignment and Grade Services token exchange endpoints are intentionally not advertised as complete yet: production LTI launch requires issuer-specific client IDs, deployment IDs, platform JWKS validation, nonce/state storage, key rotation, and AGS access tokens. Those credentials must remain server-side and should be added only after an LMS platform (Canvas, Moodle, Blackboard, etc.) is selected.
+`GET /api/lti` exposes a platform registration descriptor. Manual course codes, assignments, learner submissions, and database-side scoring are complete. A production LTI launch still requires issuer-specific client IDs, deployment IDs, platform JWKS validation, nonce/state storage, key rotation, and AGS access tokens. Those credentials must remain server-side and can only be finalized after an LMS platform (Canvas, Moodle, Blackboard, etc.) and its registration values are supplied.
+
+## Verification
+
+`npm run check` runs lint, the Node test suite, and the production build. GitHub Actions additionally installs Rust and `wasm-pack`, generates the WASM bundle, and repeats the full production build on pushes and pull requests.
 
 Required existing variables:
 
