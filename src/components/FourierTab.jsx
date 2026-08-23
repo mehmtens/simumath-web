@@ -1,60 +1,9 @@
-import { useMemo, useState } from 'react';
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
-} from 'recharts';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from 'recharts';
 import { fourierSquareWave, fourierSawtoothWave } from '../lib/fourier';
-
-export default function FourierTab() {
-  const [waveType, setWaveType] = useState('square');
-  const [n, setN] = useState(5);
-
-  const { data, title } = useMemo(() => {
-    const { t, f } = waveType === 'square' ? fourierSquareWave(n) : fourierSawtoothWave(n);
-    return {
-      data: t.map((time, i) => ({ t: Number(time.toFixed(3)), f: f[i] })),
-      title: waveType === 'square'
-        ? `Kare Dalga Sentezi (N = ${n} Harmonik)`
-        : `Üçgen Dalga Sentezi (N = ${n} Harmonik)`,
-    };
-  }, [waveType, n]);
-
-  return (
-    <div className="tab-panel">
-      <div className="control-panel">
-        <h2>Fourier Sinyal Sentezi</h2>
-        <div className="field">
-          <label><span>Dalga Tipi</span></label>
-          <select value={waveType} onChange={(e) => setWaveType(e.target.value)}>
-            <option value="square">Kare Dalga (Square Wave)</option>
-            <option value="sawtooth">Üçgen Dalga (Sawtooth Wave)</option>
-          </select>
-        </div>
-        <div className="field">
-          <label>
-            <span>Harmonik Sayısı (N)</span>
-            <span className="value">{n}</span>
-          </label>
-          <input type="range" min={1} max={100} value={n} onChange={(e) => setN(parseInt(e.target.value, 10))} />
-        </div>
-      </div>
-
-      <div className="viz-panel">
-        <div className="viz-title">{title}</div>
-        <div className="viz-body" style={{ width: '100%', height: 380 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
-              <CartesianGrid stroke="#263758" strokeDasharray="3 3" />
-              <XAxis dataKey="t" stroke="#7c8bab" tick={{ fontSize: 11 }}
-                     label={{ value: 'Zaman (t)', position: 'insideBottom', offset: -5, fill: '#7c8bab', fontSize: 11 }} />
-              <YAxis stroke="#7c8bab" tick={{ fontSize: 11 }}
-                     label={{ value: 'Genlik', angle: -90, position: 'insideLeft', fill: '#7c8bab', fontSize: 11 }} />
-              <ReferenceLine y={0} stroke="#3a4a6b" />
-              <Tooltip contentStyle={{ background: '#17233a', border: '1px solid #263758', fontSize: 12 }} />
-              <Line type="monotone" dataKey="f" name={`Fourier Toplamı (N=${n})`} stroke="#a66bff" dot={false} strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { paramNumber, readHashState, updateHashState } from '../lib/urlState';
+import { exportSvgElement, exportSvgAsPng } from '../lib/download';
+const PRESETS=[{key:'square3',name:'Kare · 3 harmonik',wave:'square',n:3,description:'Gibbs olgusunu net gösteren düşük harmonik yaklaşım.'},{key:'square25',name:'Kare · 25 harmonik',wave:'square',n:25,description:'Daha keskin kenarlı yüksek doğruluklu sentez.'},{key:'saw5',name:'Testere · 5 harmonik',wave:'sawtooth',n:5,description:'Temel spektrum yapısını okumak için.'},{key:'saw30',name:'Testere · 30 harmonik',wave:'sawtooth',n:30,description:'Geniş bant harmonik içeriği karşılaştırması.'}];
+function initialState(){const{params}=readHashState();return{waveType:params.get('wave')==='sawtooth'?'sawtooth':'square',n:Math.max(1,Math.min(100,Math.round(paramNumber(params,'n',5))))};}
+function targetValue(wave,t){const x=((t%(2*Math.PI))+2*Math.PI)%(2*Math.PI);if(wave==='square')return Math.sin(t)>=0?1:-1;return 1-x/Math.PI}
+export default function FourierTab(){const initial=useMemo(initialState,[]);const[waveType,setWaveType]=useState(initial.waveType);const[n,setN]=useState(initial.n);const timeRef=useRef(null),freqRef=useRef(null);useEffect(()=>updateHashState('fourier',{wave:waveType,n}),[waveType,n]);const{data,spectrum,title,rmse,maxError}=useMemo(()=>{const r=waveType==='square'?fourierSquareWave(n):fourierSawtoothWave(n);let se=0,me=0;const rows=r.t.map((t,i)=>{const target=targetValue(waveType,t),error=r.f[i]-target;se+=error*error;me=Math.max(me,Math.abs(error));return{t:Number(t.toFixed(3)),f:r.f[i],target,error}});return{data:rows,spectrum:r.spectrum,title:`${waveType==='square'?'Kare':'Testere'} Dalga Sentezi (N = ${n} Harmonik)`,rmse:Math.sqrt(se/Math.max(1,rows.length)),maxError:me};},[waveType,n]);const visibleSpectrum=spectrum.slice(0,Math.min(spectrum.length,30));const svg=ref=>ref.current?.querySelector('svg');const apply=p=>{setWaveType(p.wave);setN(p.n)};return <div className="tab-panel"><div className="control-panel"><h2>Fourier Intuition Builder</h2><p className="description">Harmonik sayısını sürüklerken hedef dalga, yaklaşım ve spektrumun birlikte nasıl değiştiğini izle.</p><div className="btn-row" style={{flexWrap:'wrap'}}>{PRESETS.map(p=><button key={p.key} className="btn btn-secondary" onClick={()=>apply(p)} title={p.description}>{p.name}</button>)}</div><div className="field"><label><span>Dalga Tipi</span></label><select value={waveType} onChange={e=>setWaveType(e.target.value)}><option value="square">Kare Dalga</option><option value="sawtooth">Testere Dalga</option></select></div><div className="field"><label><span>Harmonik Sayısı (N)</span><span className="value">{n}</span></label><input type="range" min="1" max="100" value={n} onChange={e=>setN(parseInt(e.target.value,10))}/></div><div className="intuition-note"><strong>RMSE = {rmse.toFixed(4)}</strong><span>Maksimum noktasal hata = {maxError.toFixed(4)} · N arttıkça genel yaklaşım iyileşir; süreksizlik çevresinde Gibbs taşması kalır.</span></div><div className="btn-row" style={{flexWrap:'wrap'}}><button className="btn btn-secondary" onClick={()=>exportSvgElement(svg(timeRef),'simumath-fourier-time.svg')}>Time SVG</button><button className="btn btn-secondary" onClick={()=>exportSvgAsPng(svg(timeRef),'simumath-fourier-time-3x.png',3)}>Time PNG 3×</button><button className="btn btn-secondary" onClick={()=>exportSvgElement(svg(freqRef),'simumath-fourier-spectrum.svg')}>Spectrum SVG</button><button className="btn btn-secondary" onClick={()=>exportSvgAsPng(svg(freqRef),'simumath-fourier-spectrum-3x.png',3)}>Spectrum PNG 3×</button></div></div><div className="viz-panel"><div className="viz-title">3.2 Dual View · {title}</div><div className="fourier-split"><section className="fourier-pane"><div className="viz-title">Time Domain · Hedef vs Fourier Yaklaşımı</div><div ref={timeRef} style={{width:'100%',height:320}}><ResponsiveContainer width="100%" height="100%"><LineChart data={data}><CartesianGrid stroke="#263758" strokeDasharray="3 3"/><XAxis dataKey="t"/><YAxis domain={[-1.5,1.5]}/><ReferenceLine y={0}/><Tooltip/><Legend/><Line type="linear" dataKey="target" name="Hedef" stroke="#7c8bab" dot={false} strokeDasharray="5 4" strokeWidth={1.5} isAnimationActive={false}/><Line type="monotone" dataKey="f" name={`Fourier N=${n}`} stroke="#a66bff" dot={false} strokeWidth={2.2} animationDuration={180}/></LineChart></ResponsiveContainer></div></section><section className="fourier-pane"><div className="viz-title">Frequency Domain · Harmonik Enerji Dağılımı</div><div ref={freqRef} style={{width:'100%',height:320}}><ResponsiveContainer width="100%" height="100%"><BarChart data={visibleSpectrum}><CartesianGrid stroke="#263758" strokeDasharray="3 3"/><XAxis dataKey="harmonic"/><YAxis/><Tooltip/><Bar dataKey="amplitude" name="Genlik" fill="#3ecf8e" animationDuration={180}/></BarChart></ResponsiveContainer></div></section></div></div></div>}

@@ -1,75 +1,9 @@
-// 2x2 matris analizi: özdeğerler (kapalı form), özvektörler ve vektör dönüşümü.
-
-const AXIS_MARGIN = 3.0;
-
-function norm(v) {
-  return Math.sqrt(v[0] * v[0] + v[1] * v[1]);
-}
-
-/**
- * A = [[a, b], [c, d]] matrisinin özdeğer/özvektörlerini kapalı formülle hesaplar.
- * @returns {Array<{isReal: boolean, real: number, imag: number, vector: number[]|null}>}
- */
-function eigenDecomposition2x2(a, b, c, d) {
-  const trace = a + d;
-  const det = a * d - b * c;
-  const discriminant = trace * trace - 4 * det;
-
-  if (discriminant >= 0) {
-    const sqrtDisc = Math.sqrt(discriminant);
-    const lambdas = [(trace + sqrtDisc) / 2, (trace - sqrtDisc) / 2];
-    return lambdas.map((lambda) => {
-      let vector;
-      if (b !== 0) {
-        vector = [b, lambda - a];
-      } else if (c !== 0) {
-        vector = [lambda - d, c];
-      } else {
-        // Köşegen matris: b=c=0. lambda 'a' ise [1,0], 'd' ise [0,1].
-        vector = Math.abs(lambda - a) < 1e-9 ? [1, 0] : [0, 1];
-      }
-      const n = norm(vector) || 1;
-      return { isReal: true, real: lambda, imag: 0, vector: [vector[0] / n, vector[1] / n] };
-    });
-  }
-
-  const realPart = trace / 2;
-  const imagPart = Math.sqrt(-discriminant) / 2;
-  return [
-    { isReal: false, real: realPart, imag: imagPart, vector: null },
-    { isReal: false, real: realPart, imag: -imagPart, vector: null },
-  ];
-}
-
-/**
- * Bir 2x2 matrisi ve vektörü analiz eder: dönüşüm, özdeğerler, çizim için eksen limiti.
- */
-export function analyzeMatrix(a, b, c, d, vx, vy) {
-  const v = [vx, vy];
-  const vTransformed = [a * vx + b * vy, c * vx + d * vy];
-
-  let maxExtent = Math.max(...v.map(Math.abs), ...vTransformed.map(Math.abs));
-  if (!Number.isFinite(maxExtent) || maxExtent === 0) maxExtent = 1.0;
-  const axisLimit = maxExtent + AXIS_MARGIN;
-
-  const eigenInfos = eigenDecomposition2x2(a, b, c, d);
-
-  return { v, vTransformed, eigenInfos, axisLimit };
-}
-
-/** Bir özdeğer bilgisini "λ1 = ..." formatında okunabilir metne çevirir. */
-export function formatEigenLabel(info, index) {
-  if (info.isReal) {
-    return `λ${index} = ${info.real.toFixed(2)}`;
-  }
-  const sign = info.imag >= 0 ? '+' : '-';
-  return `λ${index} = ${info.real.toFixed(2)} ${sign} ${Math.abs(info.imag).toFixed(2)}i (salınımlı/dönel davranış)`;
-}
-
-/** Bir özvektör doğrultusunda, eksen limitine göre ölçeklenmiş iki uç nokta döner. */
-export function eigenvectorLineEndpoints(vector, axisLimit) {
-  return [
-    [-axisLimit * vector[0], -axisLimit * vector[1]],
-    [axisLimit * vector[0], axisLimit * vector[1]],
-  ];
-}
+// 2x2 matris analizi ve eğitim amaçlı adım izleri.
+const AXIS_MARGIN=3,EPS=1e-9;const norm=v=>Math.hypot(v[0],v[1]);const clone=m=>m.map(r=>[...r]);
+function eigenDecomposition2x2(a,b,c,d){const tr=a+d,det=a*d-b*c,disc=tr*tr-4*det;if(disc>=0){const s=Math.sqrt(disc);return[(tr+s)/2,(tr-s)/2].map(lambda=>{let v;if(Math.abs(b)>EPS)v=[b,lambda-a];else if(Math.abs(c)>EPS)v=[lambda-d,c];else v=Math.abs(lambda-a)<EPS?[1,0]:[0,1];const n=norm(v)||1;return{isReal:true,real:lambda,imag:0,vector:[v[0]/n,v[1]/n]};});}const r=tr/2,i=Math.sqrt(-disc)/2;return[{isReal:false,real:r,imag:i,vector:null},{isReal:false,real:r,imag:-i,vector:null}];}
+export function analyzeMatrix(a,b,c,d,vx,vy){const v=[vx,vy],vTransformed=[a*vx+b*vy,c*vx+d*vy],determinant=a*d-b*c,trace=a+d,invertible=Math.abs(determinant)>EPS,inverse=invertible?[[d/determinant,-b/determinant],[-c/determinant,a/determinant]]:null,frobeniusNorm=Math.hypot(a,b,c,d);let maxExtent=Math.max(...v.map(Math.abs),...vTransformed.map(Math.abs));if(!Number.isFinite(maxExtent)||!maxExtent)maxExtent=1;return{v,vTransformed,eigenInfos:eigenDecomposition2x2(a,b,c,d),axisLimit:maxExtent+AXIS_MARGIN,determinant,trace,invertible,inverse,frobeniusNorm};}
+export function gaussJordan2x2(a,b,c,d){const m=[[a,b,1,0],[c,d,0,1]],steps=[{label:'Başlangıç: [A | I]',matrix:clone(m)}];for(let p=0;p<2;p++){let pr=p;for(let r=p+1;r<2;r++)if(Math.abs(m[r][p])>Math.abs(m[pr][p]))pr=r;if(Math.abs(m[pr][p])<EPS){steps.push({label:'Pivot bulunamadı: matris tekil.',matrix:clone(m),singular:true});return{singular:true,steps,inverse:null};}if(pr!==p){[m[p],m[pr]]=[m[pr],m[p]];steps.push({label:`R${p+1} ↔ R${pr+1}`,matrix:clone(m)});}const pv=m[p][p];if(Math.abs(pv-1)>EPS){m[p]=m[p].map(x=>x/pv);steps.push({label:`R${p+1} ← R${p+1} / ${pv.toFixed(3)}`,matrix:clone(m)});}for(let r=0;r<2;r++){if(r===p)continue;const f=m[r][p];if(Math.abs(f)<EPS)continue;m[r]=m[r].map((x,j)=>x-f*m[p][j]);steps.push({label:`R${r+1} ← R${r+1} - (${f.toFixed(3)})R${p+1}`,matrix:clone(m)});}}const inverse=[[m[0][2],m[0][3]],[m[1][2],m[1][3]]];steps.push({label:'Tamamlandı: [I | A⁻¹]',matrix:clone(m),done:true});return{singular:false,steps,inverse};}
+export function luTrace2x2(a,b,c,d){const steps=[{label:'A matrisi',L:[[1,0],[0,1]],U:[[a,b],[c,d]]}];if(Math.abs(a)<EPS)return{singular:true,steps:[...steps,{label:'U11 = 0: pivotlama gerekir; bu eğitim modu PA=LU pivotlamasını henüz uygulamıyor.',L:[[1,0],[0,1]],U:[[a,b],[c,d]]}]};const l21=c/a;steps.push({label:`L21 = a21 / u11 = ${c.toFixed(3)} / ${a.toFixed(3)} = ${l21.toFixed(3)}`,L:[[1,0],[l21,1]],U:[[a,b],[c,d]]});const u22=d-l21*b;const L=[[1,0],[l21,1]],U=[[a,b],[0,u22]];steps.push({label:`U22 = a22 - L21·U12 = ${u22.toFixed(3)}`,L,U});steps.push({label:'Tamamlandı: A = L·U',L,U,done:true});return{singular:Math.abs(u22)<EPS,steps,L,U};}
+export function eigenTrace2x2(a,b,c,d){const tr=a+d,det=a*d-b*c,disc=tr*tr-4*det;const steps=[{label:`1) Karakteristik denklem: det(A-λI)=λ²-(${tr.toFixed(3)})λ+(${det.toFixed(3)})=0`},{label:`2) Diskriminant Δ=tr²-4det=${disc.toFixed(3)}`}];const infos=eigenDecomposition2x2(a,b,c,d);if(disc>=0){steps.push({label:`3) Özdeğerler: λ₁=${infos[0].real.toFixed(3)}, λ₂=${infos[1].real.toFixed(3)}`});infos.forEach((x,i)=>steps.push({label:`${4+i}) (A-λ${i+1}I)v=0 çözülür → normalize özvektör [${x.vector.map(v=>v.toFixed(3)).join(', ')}]`}));}else steps.push({label:`3) Karmaşık özdeğerler: ${formatEigenLabel(infos[0],1)}, ${formatEigenLabel(infos[1],2)}`});return{steps,infos};}
+export function formatEigenLabel(info,index){if(info.isReal)return`λ${index} = ${info.real.toFixed(3)}`;const s=info.imag>=0?'+':'-';return`λ${index} = ${info.real.toFixed(3)} ${s} ${Math.abs(info.imag).toFixed(3)}i`;}
+export const eigenvectorLineEndpoints=(v,l)=>[[-l*v[0],-l*v[1]],[l*v[0],l*v[1]]];

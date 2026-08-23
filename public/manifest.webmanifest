@@ -1,0 +1,19 @@
+{
+  "name": "SimuMath Pro — Interactive Engineering Lab",
+  "short_name": "SimuMath",
+  "description": "Diferansiyel denklemler, lineer cebir, Fourier, Dijkstra ve DFA için interaktif mühendislik matematiği laboratuvarı.",
+  "start_url": "/#ode",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "lang": "tr",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

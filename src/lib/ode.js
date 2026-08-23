@@ -1,72 +1,19 @@
-// Diferansiyel denklem çözücüler — sabit adımlı RK4 (odeint'in basit ama sağlam bir muadili).
-
-const MAX_REASONABLE_MAGNITUDE = 1e6;
-
-function isNumericallyStable(values) {
-  for (const v of values) {
-    if (!Number.isFinite(v) || Math.abs(v) > MAX_REASONABLE_MAGNITUDE) return false;
-  }
-  return true;
-}
-
-/** Tek boyutlu RK4 adımı: dy/dt = f(y, t) */
-function rk4Step1D(f, y, t, dt) {
-  const k1 = f(y, t);
-  const k2 = f(y + (dt / 2) * k1, t + dt / 2);
-  const k3 = f(y + (dt / 2) * k2, t + dt / 2);
-  const k4 = f(y + dt * k3, t + dt);
-  return y + (dt / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
-}
-
-/** İki boyutlu (vektör) RK4 adımı: dY/dt = f(Y, t), Y = [y0, y1] */
-function rk4Step2D(f, Y, t, dt) {
-  const add = (a, b, s) => [a[0] + s * b[0], a[1] + s * b[1]];
-  const k1 = f(Y, t);
-  const k2 = f(add(Y, k1, dt / 2), t + dt / 2);
-  const k3 = f(add(Y, k2, dt / 2), t + dt / 2);
-  const k4 = f(add(Y, k3, dt), t + dt);
-  return [
-    Y[0] + (dt / 6) * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]),
-    Y[1] + (dt / 6) * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]),
-  ];
-}
-
-/**
- * y' = -k*y birinci mertebe diferansiyel denklemini çözer.
- * @returns {{t: number[], y: number[], isStable: boolean}}
- */
-export function solveFirstOrder(k, y0, tMax, nPoints = 500) {
-  const dt = tMax / (nPoints - 1);
-  const t = [];
-  const y = [];
-  let current = y0;
-  for (let i = 0; i < nPoints; i++) {
-    const time = i * dt;
-    t.push(time);
-    y.push(current);
-    current = rk4Step1D((yy) => -k * yy, current, time, dt);
-  }
-  return { t, y, isStable: isNumericallyStable(y) };
-}
-
-/**
- * m*y'' + c*y' + k*y = 0 sönümlü harmonik osilatörü çözer.
- * @returns {{t: number[], position: number[], velocity: number[], isStable: boolean}}
- */
-export function solveSecondOrder(m, c, k, y0, v0, tMax, nPoints = 500) {
-  const dt = tMax / (nPoints - 1);
-  const model = ([yVal, vVal]) => [vVal, -(c / m) * vVal - (k / m) * yVal];
-
-  const t = [];
-  const position = [];
-  const velocity = [];
-  let Y = [y0, v0];
-  for (let i = 0; i < nPoints; i++) {
-    const time = i * dt;
-    t.push(time);
-    position.push(Y[0]);
-    velocity.push(Y[1]);
-    Y = rk4Step2D(model, Y, time, dt);
-  }
-  return { t, position, velocity, isStable: isNumericallyStable(position) && isNumericallyStable(velocity) };
-}
+// Diferansiyel denklem çözücüleri — sabit adımlı RK4 + mühendislik preset modelleri.
+const MAX_REASONABLE_MAGNITUDE=1e6;const stable=a=>a.every(v=>Number.isFinite(v)&&Math.abs(v)<=MAX_REASONABLE_MAGNITUDE);
+function rk4Step1D(f,y,t,dt){const k1=f(y,t),k2=f(y+dt*k1/2,t+dt/2),k3=f(y+dt*k2/2,t+dt/2),k4=f(y+dt*k3,t+dt);return y+dt*(k1+2*k2+2*k3+k4)/6;}
+function rk4Step2D(f,Y,t,dt){const add=(a,b,s)=>[a[0]+s*b[0],a[1]+s*b[1]],k1=f(Y,t),k2=f(add(Y,k1,dt/2),t+dt/2),k3=f(add(Y,k2,dt/2),t+dt/2),k4=f(add(Y,k3,dt),t+dt);return[Y[0]+dt*(k1[0]+2*k2[0]+2*k3[0]+k4[0])/6,Y[1]+dt*(k1[1]+2*k2[1]+2*k3[1]+k4[1])/6];}
+const ALLOWED_FUNCTIONS=new Set(['sin','cos','tan','asin','acos','atan','sqrt','abs','exp','log','pow','min','max']);
+export function compileExpression(expression){const source=String(expression??'').trim().replace(/\^/g,'**');if(!source)throw new Error('Denklem boş olamaz.');if(!/^[0-9+\-*/().,\s_a-zA-Z*]+$/.test(source))throw new Error('Denklemde desteklenmeyen karakter var.');const ids=source.match(/[A-Za-z_][A-Za-z0-9_]*/g)??[];for(const id of ids)if(id!=='y'&&id!=='t'&&id!=='pi'&&id!=='e'&&!ALLOWED_FUNCTIONS.has(id))throw new Error(`Desteklenmeyen ifade: ${id}`);let js=source.replace(/\bpi\b/g,'Math.PI').replace(/\be\b/g,'Math.E');for(const fn of ALLOWED_FUNCTIONS)js=js.replace(new RegExp(`\\b${fn}\\b`,'g'),`Math.${fn}`);const f=new Function('y','t',`"use strict"; return (${js});`);if(!Number.isFinite(f(1,0)))throw new Error('Denklem başlangıç testinde sonlu bir sayı üretmedi.');return f;}
+export function solveCustomFirstOrder(expression,y0,tMax,nPoints=500){const f=compileExpression(expression),dt=tMax/(nPoints-1),t=[],y=[];let cur=y0;for(let i=0;i<nPoints;i++){const tt=i*dt;t.push(tt);y.push(cur);cur=rk4Step1D((yy,time)=>Number(f(yy,time)),cur,tt,dt);}return{t,y,isStable:stable(y)};}
+export function solveFirstOrder(k,y0,tMax,nPoints=500){const dt=tMax/(nPoints-1),t=[],y=[];let cur=y0;for(let i=0;i<nPoints;i++){const tt=i*dt;t.push(tt);y.push(cur);cur=rk4Step1D(yy=>-k*yy,cur,tt,dt);}return{t,y,isStable:stable(y)};}
+export function solveSecondOrder(m,c,k,y0,v0,tMax,nPoints=500){return solveState2(([y,v])=>[v,-(c/m)*v-(k/m)*y],[y0,v0],tMax,nPoints,['position','velocity']);}
+function solveState2(model,Y0,tMax,nPoints,names){const dt=tMax/(nPoints-1),t=[],a=[],b=[];let Y=[...Y0];for(let i=0;i<nPoints;i++){const tt=i*dt;t.push(tt);a.push(Y[0]);b.push(Y[1]);Y=rk4Step2D(model,Y,tt,dt);}return{t,[names[0]]:a,[names[1]]:b,isStable:stable(a)&&stable(b)};}
+export function solveRLC({R=2,L=1,C=0.5,q0=1,i0=0,tMax=20,nPoints=500}={}){const r=solveState2(([q,i])=>[i,-(R/L)*i-(1/(L*C))*q],[q0,i0],tMax,nPoints,['charge','current']);return r;}
+export function solvePendulum({length=1,damping=0.15,theta0=0.8,omega0=0,g=9.81,tMax=15,nPoints=500}={}){return solveState2(([theta,omega])=>[omega,-(g/length)*Math.sin(theta)-damping*omega],[theta0,omega0],tMax,nPoints,['angle','angularVelocity']);}
+export function solveHeatDiffusion({alpha=0.08,length=1,nx=21,tMax=3,nPoints=120}={}){nx=Math.max(5,Math.round(nx));const dx=length/(nx-1);let dt=tMax/(nPoints-1);const limit=0.45*dx*dx/alpha;if(dt>limit){nPoints=Math.ceil(tMax/limit)+1;dt=tMax/(nPoints-1);}let u=Array.from({length:nx},(_,i)=>Math.sin(Math.PI*i/(nx-1)));const snapshots=[];for(let step=0;step<nPoints;step++){const time=step*dt;if(step%(Math.max(1,Math.floor(nPoints/60)))===0||step===nPoints-1)snapshots.push({time,values:[...u]});const next=[...u];for(let i=1;i<nx-1;i++)next[i]=u[i]+alpha*dt*(u[i-1]-2*u[i]+u[i+1])/(dx*dx);next[0]=0;next[nx-1]=0;u=next;}const center=snapshots.map(s=>s.values[Math.floor(nx/2)]);return{snapshots,center,isStable:stable(center),x:Array.from({length:nx},(_,i)=>i*dx)};}
+export const ODE_ENGINEERING_PRESETS=[
+ {key:'rlc',name:'RLC Devresi',description:'Seri RLC devresinde yük ve akımın doğal tepkisi.',model:'rlc',params:{R:2,L:1,C:0.5,q0:1,i0:0,tMax:20}},
+ {key:'oscillator',name:'Harmonik Osilatör',description:'Sönümlü kütle-yay sistemi.',model:'second',params:{m:1,c:0.5,k:2,y0:5,v0:0,tMax:30}},
+ {key:'pendulum',name:'Doğrusal Olmayan Sarkaç',description:'sin(θ) içeren gerçek sarkaç dinamiği.',model:'pendulum',params:{length:1,damping:0.15,theta0:0.8,omega0:0,tMax:15}},
+ {key:'heat',name:'1B Isı Yayılımı',description:'Sonlu fark yöntemiyle çubuk boyunca ısı difüzyonu.',model:'heat',params:{alpha:0.08,length:1,nx:21,tMax:3}}
+];
