@@ -159,6 +159,17 @@ export default function CommunityTab() {
   }, [session?.user?.id]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("auth") === "community") {
+      params.delete("auth");
+      const rest = params.toString();
+      const cleanUrl =
+        window.location.pathname + (rest ? `?${rest}` : "") + "#community";
+      window.history.replaceState({}, "", cleanUrl);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const {
@@ -209,10 +220,11 @@ export default function CommunityTab() {
   const signIn = async () => {
     if (!supabase || !email.trim()) return;
     setMessage("");
+    const redirectTo = `${window.location.origin}${window.location.pathname}?auth=community`;
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: new URL("#community", window.location.href).toString(),
+        emailRedirectTo: redirectTo,
       },
     });
     setMessage(
