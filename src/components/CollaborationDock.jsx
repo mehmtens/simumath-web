@@ -3,10 +3,15 @@ import { supabase, supabaseEnabled } from "../lib/supabase";
 import { useSupabaseSession } from "../hooks/useSupabaseSession";
 
 const ROOM_KEY = "simumath:collaboration-room:v1";
+const LAB_MODULES = ["ode", "matrix", "fourier", "network", "dfa", "hardware"];
 const displayName = (session) =>
   session?.user?.user_metadata?.display_name ||
   session?.user?.email?.split("@")[0] ||
   "Katılımcı";
+const currentModuleHash = () => {
+  const raw = window.location.hash.replace(/^#/, "").split("?")[0];
+  return LAB_MODULES.includes(raw) ? window.location.hash : "#ode";
+};
 
 export default function CollaborationDock() {
   const { session } = useSupabaseSession();
@@ -87,7 +92,7 @@ export default function CollaborationDock() {
     const { data, error } = await supabase
       .rpc("create_collaboration_room", {
         room_title: title.trim(),
-        initial_hash: window.location.hash || "#ode",
+        initial_hash: currentModuleHash(),
       })
       .single();
     if (error) return setMessage(error.message);
@@ -106,15 +111,22 @@ export default function CollaborationDock() {
     window.location.hash = data.current_hash.replace(/^#/, "");
   };
   const leaveRoom = async () => {
-    if (room && session?.user && room.owner_id !== session.user.id)
-      await supabase
-        .from("collaboration_members")
-        .delete()
-        .eq("room_id", room.id)
-        .eq("user_id", session.user.id);
+    if (room && session?.user) {
+      if (room.owner_id === session.user.id) {
+        // Sahip ayrılınca odayı tamamen kapat (cascade ile üyeler de silinir)
+        await supabase.from("collaboration_rooms").delete().eq("id", room.id);
+      } else {
+        await supabase
+          .from("collaboration_members")
+          .delete()
+          .eq("room_id", room.id)
+          .eq("user_id", session.user.id);
+      }
+    }
+    const wasOwner = room?.owner_id === session?.user?.id;
     remember(null);
     setPeople([]);
-    setMessage("Canlı odadan ayrıldın.");
+    setMessage(wasOwner ? "Oda kapatıldı." : "Canlı odadan ayrıldın.");
   };
   if (!supabaseEnabled) return null;
   return (
@@ -137,7 +149,7 @@ export default function CollaborationDock() {
             Kodu Kopyala
           </button>
           <button className="btn btn-secondary" onClick={leaveRoom}>
-            Odadan Ayrıl
+            {room.owner_id === session?.user?.id ? "Odayı Kapat" : "Odadan Ayrıl"}
           </button>
         </div>
       ) : (

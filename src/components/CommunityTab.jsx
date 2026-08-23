@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase, supabaseEnabled } from "../lib/supabase";
+import { useSupabaseSession } from "../hooks/useSupabaseSession";
 
 const SEEDS = [
   {
@@ -96,11 +97,11 @@ function lastLabHash() {
 }
 
 export default function CommunityTab() {
+  const { session } = useSupabaseSession();
   const [query, setQuery] = useState("");
   const [course, setCourse] = useState("Tümü");
   const [localItems, setLocalItems] = useState(loadLocal);
   const [remote, setRemote] = useState([]);
-  const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(supabaseEnabled);
   const [busy, setBusy] = useState(false);
   const reloadTimer = useRef(null);
@@ -158,6 +159,8 @@ export default function CommunityTab() {
     setLoading(false);
   }, [session?.user?.id]);
 
+  // Magic-link giriş sonrası ?auth=community query param'ını yakala,
+  // community sekmesine geç ve URL'i temizle.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("auth") === "community") {
@@ -169,14 +172,6 @@ export default function CommunityTab() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
-    return () => subscription.unsubscribe();
-  }, []);
   useEffect(() => {
     if (supabaseEnabled) loadRemote();
   }, [loadRemote]);
